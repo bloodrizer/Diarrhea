@@ -14,6 +14,7 @@
 
 // @require http://bloodrizer.ru/diarrhea/cloudinary/jquery.fileupload.js
 // @require http://bloodrizer.ru/diarrhea/cloudinary/jquery.iframe-transport.js
+// @require http://bloodrizer.ru/diarrhea/cloudinary/jquery.cloudinary.js
 // @require http://bloodrizer.ru/diarrhea/medium/js/medium-editor.js
 
 // @require http://bloodrizer.ru/diarrhea/common/handlebars.runtime.js
@@ -26,11 +27,20 @@
 
 // ==/UserScript==
 
+   //for now we will only temper with edit pages
+   var query = window.location.search;
+   if (query != "?newpost"){
+       return;
+   }
+
 
    var MutationObserver = window.MutationObserver || window.WebKitMutationObserver || window.MozMutationObserver;
    var pageMeta = {};
 
    var _section_body;
+
+   //var unsignedUploadingKey = '634624764347287';
+   //var cloudName = 'de1r9te3m';
 
    var observer = new MutationObserver(function(mutations) {
         mutations.forEach(function(mutation) {
@@ -45,14 +55,15 @@
 
                 //truncate sidebar
                 if (node.id == "side"){
-                    node.innerHTML = "";
+                    //node.innerHTML = "";
+                    $(node).hide();
                 }
 
                 //extract author metadata
                 if (node.id == "authorName"){
                     pageMeta.userUrl = $(node).attr("href");
                     pageMeta.userName = $("span", node).html();
-                    console.log("PAGE META:", pageMeta);
+                    console.log("Extracted following user information:", pageMeta);
                 }
 
                 //main menu
@@ -106,12 +117,38 @@
         'color: #666666 !important;'+
         'background-color: #ffffff !important;'+
         'background-image: none !important;' +
-        '}';
+        '}' +
+
+        '.bs-component { padding-top: 10px; }';
+
    GM_addStyle(journalOverrideCSS);
 
     //all changes should go in onLoad block after observer is disconnected to prevent additional mutation callbacks
 
    var editor = null;
+   _publish = function(){
+       console.log(editor,  editor.serialize());
+
+       var html = "",
+           elems = editor.serialize();
+
+       for (var elem in elems){
+           html += elems[elem].value;
+       }
+       console.log("result html:", html);
+       $("#diarrhea-message").val(html);
+
+       var userUrl = pageMeta.userUrl,
+           _urlArr = userUrl.split("?");
+
+       console.log("url", _urlArr);
+
+       $("#diarrhea-journal_id").val(_urlArr[1]);
+       $("#post_form").submit();
+
+   };
+
+   var uploadContext;
 
    $( document ).ready(function() {
         observer.disconnect();
@@ -123,24 +160,72 @@
         $user.attr("href", pageMeta.userUrl);
 
         //-----------------------------------
-        var query = window.location.search;
-        if (query == "?newpost"){
+        //var query = window.location.search;
+        //if (query == "?newpost"){
 
            var editorHTML =
-               '<div class="container"><div class="page-header">Новая запись</div><div class="bs-docs-section clearfix"><div class="row"><div class="col-lg-12">' +
-                   '<div class="medium-editor"></div>' +
-               '</div></div></div></div>';
+               '<div class="container"><div class="page-header">Новая запись</div><div class="bs-docs-section clearfix">' + 
+                   '<div class="row"><div class="col-lg-12">' +
+                       '<div class="medium-editor"></div>' +
+                   '</div></div>' +
+                   '<div class="row"><div class="col-lg-12">' +
+                       '<p class="bs-component"><a href="#" onclick="_publish();" class="btn btn-default">Опубликовать</a></p>' +
+                   '</div></div>'+
+               '</div></div>' +
+
+               '<form id="post_form" method="POST" action="\" enctype="multipart/form-data">' +
+               '<input type="hidden" name="act" value="new_post_post">' +
+               '<input type="hidden" name="action" value="dosend">' + //???
+               '<input type="hidden" name="title" value="">' + //TBD
+               '<input type="hidden" id="diarrhea-journal_id" name="journal_id" value="">' +
+
+               //redundancy department of redundancy
+               '<input type="hidden" name="rewrite" value="rewrite">' +
+               '<input type="hidden" name="save_type" value="js2">' +
+               '<input type="hidden" id="diarrhea-message" name="message" value="">' +
+
+               '</form>' +
+
+               //cloudinary shit
+
+               '<form id="cloudinary-upload-form" style="display:none;"></form>';
 
            _section_body.innerHTML = editorHTML;
            editor = new MediumEditor('.medium-editor');
 
-           //wait, what? but why? how is it even supposed to be working? 
+           //wait, what? but why? how is it even supposed to be working?
            window.MediumInsert = MediumInsert;
+       
            $('.medium-editor').mediumInsert({
-                editor: editor
-           });
-        }
+               editor: editor,
+               enabled: true,
+               addons: {
+                   images: {
+                       uploadHandler: function(){
+                           //console.log("input is:", $input);
+                           var mediumInsert = this;
 
-        //$.cloudinary.config({ cloud_name: 'de1r9te3m', api_key: '634624764347287'});
+                           mediumInsert.core.hideButtons();
+                           $('#cloudinary-upload-form').unbind();
+                           console.log("upload context is", uploadContext);
+                           uploadContext.bind('cloudinarydone', function(e, data) {
+                               console.log("HURRAY UPLOAD IS DONE", data);
+                               mediumInsert.showImage(data.result.url, {
+                                   submit: function(){
+                                       console.log("submit was triggered");
+                                   }
+                               });
+                           });
+                           $('#cloudinary-upload-form')[0].file.click();
+                       }
+                   }
+               }
+            });
+        //}
+
+        $.cloudinary.config({ cloud_name: 'de1r9te3m', api_key: '634624764347287'});
+        uploadContext = $('#cloudinary-upload-form').append($.cloudinary.unsigned_upload_tag("c6abfihq", 
+            { cloud_name: 'de1r9te3m' }));
+
    });
 
