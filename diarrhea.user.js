@@ -39,9 +39,6 @@
 
    var _section_body;
 
-   //var unsignedUploadingKey = '634624764347287';
-   //var cloudName = 'de1r9te3m';
-
    var observer = new MutationObserver(function(mutations) {
         mutations.forEach(function(mutation) {
             for (var i =0; i< mutation.addedNodes.length; i++) {
@@ -50,20 +47,12 @@
                 //truncate main section of the page (with posts and shit)
                 if (node.id == "wrapper"){
                    _section_body = node;
-                   node.innerHTML = "";
                 }
-
-                //truncate sidebar
-                if (node.id == "side"){
-                    //node.innerHTML = "";
-                    $(node).hide();
-                }
-
+                
                 //extract author metadata
                 if (node.id == "authorName"){
                     pageMeta.userUrl = $(node).attr("href");
                     pageMeta.userName = $("span", node).html();
-                    console.log("Extracted following user information:", pageMeta);
                 }
 
                 //main menu
@@ -112,14 +101,16 @@
    var journalOverrideCSS = 'menu_block { font-size: initial !important; } ' +
         'body {'+
         'font-family: "Roboto", "Helvetica Neue", Helvetica, Arial, sans-serif !important;'+
-        'font-size: initial !important;'+
+        'font-size: 14px !important;'+
         'line-height: 1.846 !important;' +
         'color: #666666 !important;'+
         'background-color: #ffffff !important;'+
         'background-image: none !important;' +
         '}' +
 
-        '.bs-component { padding-top: 10px; }';
+        '.bs-component { padding-top: 10px; }' +
+
+       '#side { padding-top: 64px; }';
 
    GM_addStyle(journalOverrideCSS);
 
@@ -160,72 +151,32 @@
         $user.attr("href", pageMeta.userUrl);
 
         //-----------------------------------
-        //var query = window.location.search;
-        //if (query == "?newpost"){
 
-           var editorHTML =
-               '<div class="container"><div class="page-header">Новая запись</div><div class="bs-docs-section clearfix">' + 
-                   '<div class="row"><div class="col-lg-12">' +
-                       '<div class="medium-editor"></div>' +
-                   '</div></div>' +
-                   '<div class="row"><div class="col-lg-12">' +
-                       '<p class="bs-component"><a href="#" onclick="_publish();" class="btn btn-default">Опубликовать</a></p>' +
-                   '</div></div>'+
-               '</div></div>' +
+        $('<form id="cloudinary-upload-form" style="display:none;"></form>')
+			.appendTo($(_section_body));
 
-               '<form id="post_form" method="POST" action="\" enctype="multipart/form-data">' +
-               '<input type="hidden" name="act" value="new_post_post">' +
-               '<input type="hidden" name="action" value="dosend">' + //???
-               '<input type="hidden" name="title" value="">' + //TBD
-               '<input type="hidden" id="diarrhea-journal_id" name="journal_id" value="">' +
+        //_section_body.innerHTML = editorHTML;
+        editor = new MediumEditor('.medium-editor');
+           
+        var $messageDiv = $('<div></div>').insertAfter($('#forTextarea'));
 
-               //redundancy department of redundancy
-               '<input type="hidden" name="rewrite" value="rewrite">' +
-               '<input type="hidden" name="save_type" value="js2">' +
-               '<input type="hidden" id="diarrhea-message" name="message" value="">' +
+        var a = $('#codebuttons a')[9];
+        $("<a><img src='http://static.diary.ru/img/image.gif'></a>")
+            .click(function(){
+               uploadContext.bind('cloudinarydone', function(e, data) {
+                   insertCodeHTML( document.vbform.message, '<img src="' + data.result.url + '">');
+                   $messageDiv.html('');
+               });
+            
+               $messageDiv.html('<img src="https://upload.wikimedia.org/wikipedia/commons/d/de/Ajax-loader.gif">&nbsp;Uploading image...');
+               $('#cloudinary-upload-form')[0].file.click();
+            })
+            .insertAfter(a);
+        $(a).remove();
 
-               '</form>' +
-
-               //cloudinary shit
-
-               '<form id="cloudinary-upload-form" style="display:none;"></form>';
-
-           _section_body.innerHTML = editorHTML;
-           editor = new MediumEditor('.medium-editor');
-
-           //wait, what? but why? how is it even supposed to be working?
-           window.MediumInsert = MediumInsert;
-       
-           $('.medium-editor').mediumInsert({
-               editor: editor,
-               enabled: true,
-               addons: {
-                   images: {
-                       uploadHandler: function(){
-                           //console.log("input is:", $input);
-                           var mediumInsert = this;
-
-                           mediumInsert.core.hideButtons();
-                           $('#cloudinary-upload-form').unbind();
-                           console.log("upload context is", uploadContext);
-                           uploadContext.bind('cloudinarydone', function(e, data) {
-                               console.log("HURRAY UPLOAD IS DONE", data);
-                               mediumInsert.showImage(data.result.url, {
-                                   submit: function(){
-                                       console.log("submit was triggered");
-                                   }
-                               });
-                           });
-                           $('#cloudinary-upload-form')[0].file.click();
-                       }
-                   }
-               }
-            });
-        //}
 
         $.cloudinary.config({ cloud_name: 'de1r9te3m', api_key: '634624764347287'});
-        uploadContext = $('#cloudinary-upload-form').append($.cloudinary.unsigned_upload_tag("c6abfihq", 
-            { cloud_name: 'de1r9te3m' }));
-
+        uploadContext = $('#cloudinary-upload-form').append($.cloudinary.unsigned_upload_tag("c6abfihq",
+            { cloud_name: 'de1r9te3m' })
+        );
    });
-
