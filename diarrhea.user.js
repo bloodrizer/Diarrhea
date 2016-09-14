@@ -6,9 +6,6 @@
 // @author       You
 // @include      http://*.diary.ru/*
 // @run-at       document-start
-// @resource bootstrap_paper  http://bootswatch.com/paper/bootstrap.min.css
-// @resource medium  http://bloodrizer.ru/diarrhea/medium/css/medium-editor.min.css
-// @resource medium_insert  http://bloodrizer.ru/diarrhea/medium/css/medium-editor-insert-plugin.min.css
 // @require http://code.jquery.com/jquery-latest.js
 // @require http://bloodrizer.ru/diarrhea/cloudinary/jquery.ui.widget.js
 
@@ -47,38 +44,22 @@
                 //truncate main section of the page (with posts and shit)
                 if (node.id == "wrapper"){
                    _section_body = node;
+
+                    //var img = $('#codebuttons > img', node)[11];
+                    //console.log("IMG", img);
                 }
-                
+
+                //truncate sidebar
+                /*if (node.id == "side"){
+                    //node.innerHTML = "";
+                    $(node).hide();
+                }*/
+
                 //extract author metadata
                 if (node.id == "authorName"){
                     pageMeta.userUrl = $(node).attr("href");
                     pageMeta.userName = $("span", node).html();
                 }
-
-                //main menu
-                if ($(node).hasClass("menu_block")){
-
-                    var headerHTML =
-                        '<div class="navbar navbar-default navbar-fixed-top">' +
-                        '<div class="container">' +
-                        '<div class="navbar-header">' +
-                        '<a href="../" class="navbar-brand">DIARREAH</a>' +
-                        '</div>' +
-                        '<div class="navbar-collapse collapse" id="navbar-main">' +
-                            '<ul class="nav navbar-nav">' +
-                            '</ul>' +
-                            '<ul class="nav navbar-nav navbar-right">' +
-
-                                //TODO: actually mark this with ID, we will inject proper values later
-
-                                '<li><a id="_diarr_user"></li>' +
-                            '</ul>' +
-                        '</div>' +
-                     '</div>';
-
-                    node.innerHTML = headerHTML;
-                }
-                //console.log("JQuery version:", $().jquery
                 //diary uses jquery 2.2.1 which does not prevent 'Uncaught ReferenceError: $ is not defined' from appearing on a page.
             }
         }); //
@@ -88,31 +69,6 @@
       { childList: true, subtree: true}
    );
 
-   GM_addStyle(
-       GM_getResourceText("bootstrap_paper"));
-   GM_addStyle(
-       GM_getResourceText("medium"));
-   GM_addStyle(
-       GM_getResourceText("medium_insert"));
-
-    /*
-      intercepting individual styles is a messy and tedious task, it's better just to override some of diary design decisions in custom css
-    */
-   var journalOverrideCSS = 'menu_block { font-size: initial !important; } ' +
-        'body {'+
-        'font-family: "Roboto", "Helvetica Neue", Helvetica, Arial, sans-serif !important;'+
-        'font-size: 14px !important;'+
-        'line-height: 1.846 !important;' +
-        'color: #666666 !important;'+
-        'background-color: #ffffff !important;'+
-        'background-image: none !important;' +
-        '}' +
-
-        '.bs-component { padding-top: 10px; }' +
-
-       '#side { padding-top: 64px; }';
-
-   GM_addStyle(journalOverrideCSS);
 
     //all changes should go in onLoad block after observer is disconnected to prevent additional mutation callbacks
 
@@ -150,25 +106,27 @@
         $user.html(pageMeta.userName);
         $user.attr("href", pageMeta.userUrl);
 
-        //-----------------------------------
-
         $('<form id="cloudinary-upload-form" style="display:none;"></form>')
-			.appendTo($(_section_body));
+               .appendTo($(_section_body));
 
-        //_section_body.innerHTML = editorHTML;
-        editor = new MediumEditor('.medium-editor');
-           
+           //_section_body.innerHTML = editorHTML;
+           editor = new MediumEditor('.medium-editor');
+
         var $messageDiv = $('<div></div>').insertAfter($('#forTextarea'));
 
         var a = $('#codebuttons a')[9];
         $("<a><img src='http://static.diary.ru/img/image.gif'></a>")
             .click(function(){
-               uploadContext.bind('cloudinarydone', function(e, data) {
+               uploadContext.unbind();
+               uploadContext
+                   .bind('fileuploadstart', function(e, data) {
+                       $messageDiv.html('<img src="https://upload.wikimedia.org/wikipedia/commons/d/de/Ajax-loader.gif">&nbsp;Uploading image...');
+                   })
+                   .bind('cloudinarydone', function(e, data) {
                    insertCodeHTML( document.vbform.message, '<img src="' + data.result.url + '">');
                    $messageDiv.html('');
                });
-            
-               $messageDiv.html('<img src="https://upload.wikimedia.org/wikipedia/commons/d/de/Ajax-loader.gif">&nbsp;Uploading image...');
+
                $('#cloudinary-upload-form')[0].file.click();
             })
             .insertAfter(a);
@@ -180,3 +138,5 @@
             { cloud_name: 'de1r9te3m' })
         );
    });
+
+//https://github.com/bloodrizer/Diarrhea/blob/master/diarrhea.user.js
